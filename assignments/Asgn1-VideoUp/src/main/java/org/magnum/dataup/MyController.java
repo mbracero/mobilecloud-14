@@ -27,6 +27,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class MyController {
 	
 	private Collection<Video> videos = new CopyOnWriteArrayList<Video>();
+
+	private static final AtomicLong currentId = new AtomicLong(0L);
+	private static final int CODE_STATUS_NOT_FOUND = 404;
 	
 	/**
 	 * GET /video
@@ -63,42 +66,13 @@ public class MyController {
 	 */
 	@RequestMapping(value=VideoSvcApi.VIDEO_SVC_PATH, method=RequestMethod.POST)
 	public @ResponseBody Video addVideo(@RequestBody Video v){
-		// Add ID
 		checkAndSetId(v);
-		
-		// Set data url
 		v.setDataUrl(getDataUrl(v.getId()));
-		
-		// Add in list
 		videos.add(v);
 		
-		// Return value
 		return v;
 	}
 	
-	private static final AtomicLong currentId = new AtomicLong(0L);
-	private static final int CODE_STATUS_NOT_FOUND = 404;
-	
-	private void checkAndSetId(Video entity) {
-        if(entity.getId() == 0){
-            entity.setId(currentId.incrementAndGet());
-        }
-    }
-	
-	private String getDataUrl(long videoId){
-        String url = getUrlBaseForLocalServer() + "/video/" + videoId + "/data";
-        return url;
-    }
-
-    private String getUrlBaseForLocalServer() {
-       HttpServletRequest request = 
-           ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
-       String base = 
-          "http://"+request.getServerName() 
-          + ((request.getServerPort() != 80) ? ":"+request.getServerPort() : "");
-       return base;
-    }
-    
     /**
      * POST /video/{id}/data
      * 
@@ -116,7 +90,15 @@ public class MyController {
 	public @ResponseBody VideoStatus setVideoData(
 			@PathVariable(value=VideoSvcApi.ID_PARAMETER) long id,
 			@RequestParam(value=VideoSvcApi.DATA_PARAMETER) MultipartFile videoData,
-			HttpServletResponse response
+			HttpServletResponse response /**
+										 * Any Controller method can take an HttpServletRequest or HttpServletResponse as parameters to gain
+										 * low-level access/control over the HTTP messages. Spring will automatically fill in these parameters
+										 * when your Controller's method is invoked.
+										 * 
+										 * Maybe you want to set the status code with the response
+										 * or write some binary data to an OutputStream obtained from
+										 * the HttpServletResponse object
+										 */
 	) throws IOException {
     	try {
     		InputStream inputStream = videoData.getInputStream();
@@ -147,7 +129,15 @@ public class MyController {
     @RequestMapping(value=VideoSvcApi.VIDEO_DATA_PATH, method=RequestMethod.GET)
     public @ResponseBody void getData(
     		@PathVariable(value=VideoSvcApi.ID_PARAMETER) long id,
-    		HttpServletResponse response
+    		HttpServletResponse response /**
+										 * Any Controller method can take an HttpServletRequest or HttpServletResponse as parameters to gain
+										 * low-level access/control over the HTTP messages. Spring will automatically fill in these parameters
+										 * when your Controller's method is invoked.
+										 * 
+										 * Maybe you want to set the status code with the response
+										 * or write some binary data to an OutputStream obtained from
+										 * the HttpServletResponse object
+										 */
     ) throws IOException {
     	try {
 	    	Video video = null;
@@ -162,5 +152,28 @@ public class MyController {
     	} catch (Exception e) {
     		response.sendError(CODE_STATUS_NOT_FOUND);
 		}
+    }
+    
+    /**
+     * UTILS
+     */
+	private void checkAndSetId(Video entity) {
+        if(entity.getId() == 0){
+            entity.setId(currentId.incrementAndGet());
+        }
+    }
+	
+	private String getDataUrl(long videoId){
+        String url = getUrlBaseForLocalServer() + "/video/" + videoId + "/data";
+        return url;
+    }
+
+    private String getUrlBaseForLocalServer() {
+       HttpServletRequest request = 
+           ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+       String base = 
+          "http://"+request.getServerName() 
+          + ((request.getServerPort() != 80) ? ":"+request.getServerPort() : "");
+       return base;
     }
 }
