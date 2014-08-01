@@ -2,19 +2,19 @@ package org.magnum.dataup;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.List;
+import java.util.Collection;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.magnum.dataup.model.Video;
 import org.magnum.dataup.model.VideoStatus;
 import org.magnum.dataup.model.VideoStatus.VideoState;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.datasource.embedded.OutputStreamFactory;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -28,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Controller
 public class MyController {
 	
-	private List<Video> videos = new CopyOnWriteArrayList<Video>();
+	private Collection<Video> videos = new CopyOnWriteArrayList<Video>();
 	
 	/**
 	 * GET /video
@@ -40,7 +40,7 @@ public class MyController {
 	 * The return content-type should be application/json, which will be the default if you use @ResponseBody
 	 */
 	@RequestMapping(value=VideoSvcApi.VIDEO_SVC_PATH, method=RequestMethod.GET)
-	public @ResponseBody List<Video> getVideos() {
+	public @ResponseBody Collection<Video> getVideos() {
 		return videos;
 	}
 	
@@ -115,9 +115,9 @@ public class MyController {
      */
 	@RequestMapping(value=VideoSvcApi.VIDEO_DATA_PATH, method=RequestMethod.POST)
 	public @ResponseBody VideoStatus setVideoData(
-			@RequestParam(value=VideoSvcApi.ID_PARAMETER) long id,
+			@PathVariable(value=VideoSvcApi.ID_PARAMETER) long id,
 			@RequestParam(value=VideoSvcApi.DATA_PARAMETER) MultipartFile videoData
-	) {
+	) throws ResourceNotFoundException {
     	try {
     		InputStream inputStream = videoData.getInputStream();
 	    	
@@ -131,7 +131,8 @@ public class MyController {
 	    	VideoFileManager videoFileManager = VideoFileManager.get();
 	    	videoFileManager.saveVideoData(video, inputStream);
     	} catch (IOException e) {
-    		e.printStackTrace();
+    		throw new ResourceNotFoundException();
+    		//throw new ResourceNotFoundException("ID non existant!, " + id);
 		}
     	
     	VideoStatus videoStatus = new VideoStatus(VideoState.READY);
@@ -150,8 +151,9 @@ public class MyController {
      * the server should return a 404 status code.
      */
     @RequestMapping(value=VideoSvcApi.VIDEO_DATA_PATH, method=RequestMethod.GET)
-    public @ResponseBody OutputStream getData(@RequestParam(value=VideoSvcApi.ID_PARAMETER) long id) {
-    	OutputStream outputStream = OutputStreamFactory.getNoopOutputStream();
+    public @ResponseBody void getData(
+    		@PathVariable(value=VideoSvcApi.ID_PARAMETER) long id,
+    		HttpServletResponse response) throws ResourceNotFoundException {
     	try {
 	    	Video video = null;
 	    	for (Video v : videos) {
@@ -161,11 +163,11 @@ public class MyController {
 			}
 	    	
 	    	VideoFileManager videoFileManager = VideoFileManager.get();
-    		videoFileManager.copyVideoData(video, outputStream);
+    		videoFileManager.copyVideoData(video, response.getOutputStream());
     	} catch (IOException e) {
-    		e.printStackTrace();
+    		//response.sendError(404);;
+    		throw new ResourceNotFoundException();
+    		//throw new ResourceNotFoundException("ID non existant!, " + id);
 		}
-    	
-    	return outputStream;
     }
 }
